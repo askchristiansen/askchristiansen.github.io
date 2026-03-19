@@ -198,27 +198,141 @@ function Effektivitet({ player, bench, metrics }) {
   )
 }
 
+// ── RISIKO HELPERS ────────────────────────────────────────────────────────────
+function getRiskCategories(player, bench, posGrp) {
+  const s = player.stats
+  const scale = leagueScale[player.league] ?? 0.75
+  const mins = s.minutes ?? 0
+
+  // 1. Liga-oversettbarhet
+  const ligaRisk = scale >= 0.90 ? { score:15, label:'Lav', color:CGREEN,
+    text:`${player.league} (koeff. ${scale.toFixed(2)}) er nær Eliteserien-nivå. Begrenset skaleringsrisiko.` }
+    : scale >= 0.80 ? { score:40, label:'Middels', color:CAMBER,
+    text:`${player.league} (koeff. ${scale.toFixed(2)}) er et hakk under Eliteserien. Forventet 5–15% prestasjonsdipp i innkjøring.` }
+    : { score:70, label:'Høy', color:CRED,
+    text:`${player.league} (koeff. ${scale.toFixed(2)}) er markant svakere enn Eliteserien. Signifikant skaleringsrisiko — særlig tempo og press.` }
+
+  // 2. Sample size
+  const sampleRisk = mins >= 2500 ? { score:10, label:'Solid', color:CGREEN,
+    text:`${mins.toLocaleString()} minutter gir statistisk robuste tall. Lav varians i estimatene.` }
+    : mins >= 1500 ? { score:35, label:'OK', color:CAMBER,
+    text:`${mins.toLocaleString()} minutter er tilstrekkelig men ikke optimalt. Noen tall kan svinge ved mer spilletid.` }
+    : { score:65, label:'Svak', color:CRED,
+    text:`${mins.toLocaleString()} minutter er for lite for stabile estimater. Høy usikkerhet i alle nøkkeltall.` }
+
+  // 3. xG-overperformance (mest relevant for CF/WING)
+  const xgDiff = (s.goals ?? 0) - (s.xG ?? 0)
+  const xgRisk = ['CF','WING'].includes(posGrp)
+    ? (xgDiff > 0.15 ? { score:70, label:'Høy', color:CRED,
+        text:`G–xG +${xgDiff.toFixed(2)}/90 — overperformer forventet. Regresjon mot xG er sannsynlig i ny kontekst.` }
+      : xgDiff < -0.10 ? { score:30, label:'Lav', color:CGREEN,
+        text:`G–xG ${xgDiff.toFixed(2)}/90 — underperformer xG. Oppsidepotensial hvis finishing normaliseres.` }
+      : { score:20, label:'Nøytral', color:CAMBER,
+        text:`G–xG ${xgDiff.toFixed(2)}/90 — scorer på linje med xG. Stabilt output.` })
+    : { score:10, label:'N/A', color:CGRAY,
+        text:`xG-overperformance er lite relevant for ${posGroupLabels[posGrp]}.` }
+
+  // 4. Taktisk fit
+  const tacticalRisks = {
+    CF:   s.duelWin < 48 ? { score:55, label:'Middels', color:CAMBER,
+            text:`Duell% ${(s.duelWin??0).toFixed(1)}% er under 48% — Viking presser høyt og trenger spiss som kan holde ball under press.` }
+          : { score:20, label:'Lav', color:CGREEN, text:`Duell% på ${(s.duelWin??0).toFixed(1)}% er tilfredsstillende for Vikings pressende spillestil.` },
+    WING: s.progRuns < 3.0 ? { score:50, label:'Middels', color:CAMBER,
+            text:`ProgRuns ${(s.progRuns??0).toFixed(2)}/90 er lavt for Vikings offensive bredde-spill. Forventes å gå opp med bedre støttestruktur.` }
+          : { score:15, label:'Lav', color:CGREEN, text:`ProgRuns ${(s.progRuns??0).toFixed(2)}/90 — passer Vikings brede, progressive spillestil.` },
+    CM:   s.interceptions < 2.5 ? { score:55, label:'Middels', color:CAMBER,
+            text:`Int/90 ${(s.interceptions??0).toFixed(2)} er under 2.5 — Vikings PPDA ~8.1 krever aktiv pressing fra midtbane.` }
+          : { score:15, label:'Lav', color:CGREEN, text:`Int/90 ${(s.interceptions??0).toFixed(2)} viser pressing-kapasitet som matcher Vikings høye intensitet.` },
+    CB:   s.passAcc < 82 ? { score:50, label:'Middels', color:CAMBER,
+            text:`Pass% ${(s.passAcc??0).toFixed(1)}% er under 82% — Viking bygger fra bak og krever trygg pasningsspiller i forsvarslinjen.` }
+          : { score:15, label:'Lav', color:CGREEN, text:`Pass% ${(s.passAcc??0).toFixed(1)}% matcher Vikings ball-baserte forsvarsspill.` },
+    BACK: s.progRuns < 1.2 ? { score:55, label:'Middels', color:CAMBER,
+            text:`ProgRuns ${(s.progRuns??0).toFixed(2)}/90 er lavt for en Viking-back som forventes å overlappe aktivt.` }
+          : { score:20, label:'Lav', color:CGREEN, text:`ProgRuns ${(s.progRuns??0).toFixed(2)}/90 — kan bidra i Vikings overlappende back-spill.` },
+  }
+  const tactRisk = tacticalRisks[posGrp] ?? { score:25, label:'Lav', color:CGREEN, text:'Taktisk profil passer.' }
+
+  // 5. Alder / adaptasjon
+  const ageRisk = (player.age ?? 25) < 20 ? { score:45, label:'Middels', color:CAMBER,
+      text:`${player.age} år — ung spiller med høyt potensial, men adaptasjonsperiode kan ta lengre tid. Marg for utvikling.` }
+    : (player.age ?? 25) > 27 ? { score:30, label:'Lav-middels', color:CAMBER,
+      text:`${player.age} år — erfaren profil. Raskere innkjøring, men begrenset salgspotensial.` }
+    : { score:15, label:'Lav', color:CGREEN,
+      text:`${player.age} år — optimal alder for adaptasjon og utvikling i ny liga.` }
+
+  return [
+    { kategori:'Liga-oversettbarhet', ...ligaRisk },
+    { kategori:'Sample size',         ...sampleRisk },
+    { kategori:'xG-stabilitet',       ...xgRisk },
+    { kategori:'Taktisk fit',         ...tactRisk },
+    { kategori:'Alder / adaptasjon',  ...ageRisk },
+  ]
+}
+
+function getVerdict(player, bench, posGrp) {
+  const s = player.stats
+  const scale = leagueScale[player.league] ?? 0.75
+  const riskCats = getRiskCategories(player, bench, posGrp)
+  const avgRisk = riskCats.reduce((sum, r) => sum + r.score, 0) / riskCats.length
+
+  // Posisjonsspesifikke terskler
+  const thresholds = {
+    CF:   { buyKeys:['goals','xG','duelWin'],   buyMin:[0.40, 0.30, 48] },
+    WING: { buyKeys:['goals','dribbleSucc','progRuns'], buyMin:[0.30, 55, 3.5] },
+    CM:   { buyKeys:['passAcc','interceptions','duelWin'], buyMin:[78, 3.0, 46] },
+    CB:   { buyKeys:['duelWin','aerialWin','interceptions'], buyMin:[60, 58, 4.0] },
+    BACK: { buyKeys:['duelWin','passAcc','progRuns'], buyMin:[50, 76, 1.0] },
+  }[posGrp] ?? { buyKeys:[], buyMin:[] }
+
+  const meetsMin = thresholds.buyKeys.filter((k,i) => (s[k]??0) >= thresholds.buyMin[i]).length
+  const totalMin = thresholds.buyKeys.length
+
+  if (meetsMin === totalMin && avgRisk < 30 && scale >= 0.85) {
+    return {
+      verdict: 'STRONG BUY',
+      color: '#166534',
+      bg: '#dcfce7',
+      icon: '🟢',
+      reasoning: `Møter alle posisjonsspesifikke terskler, lav samlet risiko (${Math.round(avgRisk)}/100) og sterk liga-overførbarhet (${scale.toFixed(2)}). Anbefales prioritert.`
+    }
+  }
+  if (meetsMin >= Math.ceil(totalMin * 0.67) && avgRisk < 50) {
+    return {
+      verdict: 'BUY',
+      color: '#14532d',
+      bg: '#f0fdf4',
+      icon: '🟡',
+      reasoning: `Møter ${meetsMin}/${totalMin} nøkkelterskler. Moderat risiko (${Math.round(avgRisk)}/100). Anbefales med forbehold om tilpasningsperiode.`
+    }
+  }
+  if (meetsMin >= Math.ceil(totalMin * 0.50) && avgRisk < 65) {
+    return {
+      verdict: 'MONITOR',
+      color: '#92400e',
+      bg: '#fffbeb',
+      icon: '🟠',
+      reasoning: `Møter ${meetsMin}/${totalMin} terskler. Risikoprofil (${Math.round(avgRisk)}/100) krever tettere oppfølging. Vurder på nytt ved mer data.`
+    }
+  }
+  return {
+    verdict: 'PASS',
+    color: '#7f1d1d',
+    bg: '#fef2f2',
+    icon: '🔴',
+    reasoning: `Møter kun ${meetsMin}/${totalMin} terskler med høy risikoprofil (${Math.round(avgRisk)}/100). Passer ikke Viking FKs krav for denne posisjonen i dag.`
+  }
+}
+
 // ── RISIKOVURDERING ───────────────────────────────────────────────────────────
 function Risikovurdering({ player, bench, metrics }) {
   const s = player.stats
-  const isPct = k => ['passAcc','duelWin','aerialWin','longPassAcc','dribbleSucc'].includes(k)
-
-  const factors = metrics.risiko.map(k => {
-    const pv = s[k] ?? 0; const bv = bench.stats[k] ?? 0
-    const diff = bv > 0 ? ((pv - bv) / bv) * 100 : 0
-    return {
-      label: (metrics.labels?.[k] ?? k) + ' vs benchmark',
-      score: Math.min(90, Math.round(Math.abs(diff))),
-      color: diff > 15 ? CGREEN : diff < -15 ? CRED : CAMBER,
-    }
-  })
-
-  const avgScore = factors.reduce((s,f) => s+f.score, 0) / factors.length
-  const risk = avgScore > 55
-    ? { label: 'HØY', color: CRED, pos: '75%' }
-    : avgScore > 30
-    ? { label: 'MIDDELS', color: CAMBER, pos: '50%' }
-    : { label: 'LAV', color: CGREEN, pos: '25%' }
+  const posGrp = player.posGroup
+  const riskCats = getRiskCategories(player, bench, posGrp)
+  const verdict  = getVerdict(player, bench, posGrp)
+  const avgRisk  = riskCats.reduce((sum,r) => sum+r.score, 0) / riskCats.length
+  const riskLevel = avgRisk > 55 ? { label:'HØY',    color:CRED,   pos:'75%' }
+                  : avgRisk > 30 ? { label:'MIDDELS', color:CAMBER, pos:'50%' }
+                  :                { label:'LAV',     color:CGREEN, pos:'25%' }
 
   const keyBar = metrics.risiko.slice(0,3).map(k => ({
     n: metrics.labels?.[k] ?? k,
@@ -228,20 +342,40 @@ function Risikovurdering({ player, bench, metrics }) {
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 24 }}>
-        <KPI label="Risikonivå" value={risk.label} sub="Samlet vurdering" color={risk.color} />
-        <KPI label="Alder" value={player.age ?? '—'} sub="år" color={player.age < 22 ? CGREEN : CGRAY} />
-        <KPI label="Liga-skala" value={(leagueScale[player.league] ?? 0.75).toFixed(2)} sub={player.league} color={CGRAY} />
-        <KPI label="Posisjon" value={posGroupLabels[player.posGroup]} sub={`Benchmark: ${bench.name}`} color={CBLUE} />
+      {/* VERDICT BOX */}
+      <div style={{
+        background: verdict.bg,
+        border: `2px solid ${verdict.color}`,
+        borderRadius: 10, padding: '16px 20px', marginBottom: 24,
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:8 }}>
+          <span style={{ fontSize:22 }}>{verdict.icon}</span>
+          <span style={{ fontSize:20, fontWeight:900, color:verdict.color, letterSpacing:1 }}>
+            {verdict.verdict}
+          </span>
+          <span style={{ fontSize:12, color:'#666', fontStyle:'italic' }}>
+            — Anbefaling for Viking FK
+          </span>
+        </div>
+        <p style={{ margin:0, fontSize:13, color:'#333', lineHeight:1.6 }}>
+          {verdict.reasoning}
+        </p>
       </div>
 
-      <STitle>Nøkkeltall vs benchmark — {posGroupLabels[player.posGroup]}</STitle>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 24 }}>
+        <KPI label="Samlet risiko" value={riskLevel.label} sub={`Snitt ${Math.round(avgRisk)}/100`} color={riskLevel.color} />
+        <KPI label="Alder" value={player.age ?? '—'} sub="år" color={(player.age??25) < 22 ? CGREEN : CGRAY} />
+        <KPI label="Liga-koeff." value={(leagueScale[player.league]??0.75).toFixed(2)} sub={player.league} color={(leagueScale[player.league]??0.75) >= 0.88 ? CGREEN : CAMBER} />
+        <KPI label="Minutter" value={(s.minutes??0).toLocaleString()} sub={`${s.matches??'—'} kamper`} color={(s.minutes??0) >= 2000 ? CGREEN : CAMBER} />
+      </div>
+
+      <STitle>Nøkkeltall vs benchmark — {posGroupLabels[posGrp]}</STitle>
       <Leg items={[{ color: CBLUE, label: player.name }, { color: CGRAY, label: bench.name }]} />
       <ResponsiveContainer width="100%" height={150}>
-        <BarChart data={keyBar} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+        <BarChart data={keyBar} margin={{ top:4, right:4, bottom:0, left:-20 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#eee" vertical={false} />
-          <XAxis dataKey="n" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} />
+          <XAxis dataKey="n" tick={{ fontSize:11 }} />
+          <YAxis tick={{ fontSize:11 }} />
           <Tooltip />
           <Bar dataKey="spiller" name={player.name} fill={CBLUE} radius={[4,4,0,0]} />
           <Bar dataKey="benchmark" name={bench.name} fill={CGRAY} radius={[4,4,0,0]} />
@@ -250,27 +384,35 @@ function Risikovurdering({ player, bench, metrics }) {
 
       <Div />
       <STitle>Risikomåler</STitle>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, margin: '12px 0 20px' }}>
-        <span style={{ fontSize: 11, color: '#888' }}>LAV</span>
-        <div style={{ flex: 1, height: 8, background: 'linear-gradient(to right, #2a7a3e, #b8920f, #c0392b)', position: 'relative', borderRadius: 4 }}>
-          <div style={{ position: 'absolute', top: '50%', left: risk.pos, transform: 'translate(-50%,-50%)', width: 16, height: 16, background: '#1a1a1a', border: '2.5px solid white', borderRadius: '50%' }} />
+      <div style={{ display:'flex', alignItems:'center', gap:16, margin:'12px 0 20px' }}>
+        <span style={{ fontSize:11, color:'#888' }}>LAV</span>
+        <div style={{ flex:1, height:8, background:'linear-gradient(to right, #2a7a3e, #b8920f, #c0392b)', position:'relative', borderRadius:4 }}>
+          <div style={{ position:'absolute', top:'50%', left:riskLevel.pos, transform:'translate(-50%,-50%)', width:16, height:16, background:'#1a1a1a', border:'2.5px solid white', borderRadius:'50%' }} />
         </div>
-        <span style={{ fontSize: 11, color: '#888' }}>HØY</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: risk.color, whiteSpace: 'nowrap' }}>{risk.label}</span>
+        <span style={{ fontSize:11, color:'#888' }}>HØY</span>
+        <span style={{ fontSize:12, fontWeight:700, color:riskLevel.color, whiteSpace:'nowrap' }}>{riskLevel.label}</span>
       </div>
 
-      <STitle>Avvik fra benchmark</STitle>
-      {factors.map(({ label, score, color }) => (
-        <div key={label} style={{ marginBottom: 10 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#666', marginBottom: 3 }}>
-            <span>{label}</span>
-            <span style={{ color, fontWeight: 600 }}>{score}/100</span>
+      <STitle>Risikotypologi — hva kan gå galt?</STitle>
+      <div style={{ display:'flex', flexDirection:'column', gap:10, marginTop:8 }}>
+        {riskCats.map(({ kategori, score, label, color, text }) => (
+          <div key={kategori} style={{
+            background:'#f9f9f7', borderRadius:8, padding:'12px 14px',
+            borderLeft:`4px solid ${color}`,
+          }}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:4 }}>
+              <span style={{ fontSize:12, fontWeight:700, color:'#1a1a1a' }}>{kategori}</span>
+              <span style={{ fontSize:11, fontWeight:700, color, background: color+'22', padding:'2px 8px', borderRadius:99 }}>
+                {label} · {score}/100
+              </span>
+            </div>
+            <p style={{ margin:0, fontSize:12, color:'#555', lineHeight:1.55 }}>{text}</p>
+            <div style={{ marginTop:6, height:4, background:'#eee', borderRadius:2, overflow:'hidden' }}>
+              <div style={{ width:`${Math.min(score,100)}%`, height:'100%', background:color, borderRadius:2 }} />
+            </div>
           </div>
-          <div style={{ height: 6, background: '#eee', borderRadius: 3, overflow: 'hidden' }}>
-            <div style={{ width: score+'%', height: '100%', background: color, borderRadius: 3 }} />
-          </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }
@@ -633,17 +775,14 @@ export default function PlayerDashboard({ player }) {
     return <div style={{ padding:32, fontFamily:'system-ui' }}>Ingen benchmark for posisjon: {posGrp}</div>
   }
 
-  const fitLabel = (() => {
-    let b = 0, w = 0
-    metrics.risiko.forEach(k => {
-      const r = compareVsBenchmark(player.stats[k] ?? 0, bench.stats[k] ?? 0)
-      if (r === 'better') b++
-      if (r === 'weaker') w++
-    })
-    if (b >= 3) return { label:'STRONG FIT',      color:'#3B6D11' }
-    if (w >= 3) return { label:'DEVELOPMENT FIT', color:'#C0392B' }
-    return            { label:'CONDITIONAL FIT',  color:'#185FA5' }
-  })()
+  const verdict = getVerdict(player, bench, posGrp)
+
+  const verdictBadge = {
+    'STRONG BUY': { bg:'#166534', text:'#dcfce7' },
+    'BUY':        { bg:'#15803d', text:'#f0fdf4' },
+    'MONITOR':    { bg:'#b45309', text:'#fffbeb' },
+    'PASS':       { bg:'#b91c1c', text:'#fef2f2' },
+  }[verdict.verdict] ?? { bg:'#374151', text:'#f9fafb' }
 
   // Select correct VikingFit component per position
   const VikingFitComp = {
@@ -672,13 +811,19 @@ export default function PlayerDashboard({ player }) {
           {player.club} · {player.league} · {posGroupLabels[posGrp]}
         </span>
       </div>
-      <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:24 }}>
-        <span style={{ fontSize:11, fontWeight:700, letterSpacing:'0.08em', padding:'4px 10px',
-          border:`1.5px solid ${fitLabel.color}`, color:fitLabel.color, borderRadius:2 }}>
-          {fitLabel.label}
+      <div style={{ display:'flex', gap:8, alignItems:'center', marginBottom:24, flexWrap:'wrap' }}>
+        <span style={{
+          fontSize:12, fontWeight:800, letterSpacing:'0.1em',
+          padding:'5px 14px', borderRadius:4,
+          background: verdictBadge.bg, color: verdictBadge.text,
+        }}>
+          {verdict.icon} {verdict.verdict}
         </span>
         <span style={{ fontSize:12, color:'#888' }}>
           {player.nationality} · {player.age ?? '—'} år · Benchmark: {bench.fullName}
+        </span>
+        <span style={{ fontSize:12, color:'#999', fontStyle:'italic', marginLeft:'auto' }}>
+          Klikk Risikovurdering for full begrunnelse
         </span>
       </div>
 
