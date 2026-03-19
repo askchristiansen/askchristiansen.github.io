@@ -9,14 +9,60 @@ import KilenDashboard from "./KilenDashboard";
 const RC = { better:"#22c55e", similar:"#eab308", weaker:"#ef4444" };
 const RL = { better:"↑ Bedre", similar:"~ På nivå", weaker:"↓ Svakere" };
 
-// Scatter axes per position group
+// ── Position-specific table columns ──────────────────────────────────────────
+const tableCols = {
+  CF:   [
+    {l:"G/90",       k:"goals",          isPct:false},
+    {l:"xG/90",      k:"xG",             isPct:false},
+    {l:"SoT/90",     k:"shotsOT",        isPct:false},
+    {l:"Touch felt", k:"touchesPenArea", isPct:false},
+    {l:"Duell%",     k:"duelWin",        isPct:true },
+    {l:"Luft%",      k:"aerialWin",      isPct:true },
+  ],
+  WING: [
+    {l:"G/90",       k:"goals",          isPct:false},
+    {l:"A/90",       k:"assists",        isPct:false},
+    {l:"Dribble%",   k:"dribbleSucc",    isPct:true },
+    {l:"ProgRuns",   k:"progRuns",       isPct:false},
+    {l:"ShotAss/90", k:"shotAssists",    isPct:false},
+    {l:"Touch felt", k:"touchesPenArea", isPct:false},
+  ],
+  CM:   [
+    {l:"Pass%",      k:"passAcc",        isPct:true },
+    {l:"Int/90",     k:"interceptions",  isPct:false},
+    {l:"Duell%",     k:"duelWin",        isPct:true },
+    {l:"ProgRuns",   k:"progRuns",       isPct:false},
+    {l:"ShotAss/90", k:"shotAssists",    isPct:false},
+    {l:"Rec.opp/90", k:"recoveriesOpp",  isPct:false},
+  ],
+  CB:   [
+    {l:"Duell%",     k:"duelWin",        isPct:true },
+    {l:"Luft%",      k:"aerialWin",      isPct:true },
+    {l:"Int/90",     k:"interceptions",  isPct:false},
+    {l:"Pass%",      k:"passAcc",        isPct:true },
+    {l:"LongPass%",  k:"longPassAcc",    isPct:true },
+    {l:"ProgRuns",   k:"progRuns",       isPct:false},
+  ],
+  BACK: [
+    {l:"Duell%",     k:"duelWin",        isPct:true },
+    {l:"Pass%",      k:"passAcc",        isPct:true },
+    {l:"ProgRuns",   k:"progRuns",       isPct:false},
+    {l:"ShotAss/90", k:"shotAssists",    isPct:false},
+    {l:"Int/90",     k:"interceptions",  isPct:false},
+    {l:"Luft%",      k:"aerialWin",      isPct:true },
+  ],
+};
+
+// ALL view: no stat columns — only name/club/pos/min/rating
+// (stats are meaningless across positions)
+
 const scatterAxes = {
-  ALL:  { xKey:"passAcc",  yKey:"duelWin",       xLabel:"Pass%",        yLabel:"Duell%" },
-  CF:   { xKey:"goals",    yKey:"xG",            xLabel:"Goals/90",     yLabel:"xG/90" },
-  WING: { xKey:"progRuns", yKey:"dribbleSucc",   xLabel:"ProgRuns/90",  yLabel:"Dribble%" },
-  CM:   { xKey:"passAcc",  yKey:"interceptions", xLabel:"Pass%",        yLabel:"Int/90" },
-  CB:   { xKey:"passAcc",  yKey:"duelWin",       xLabel:"Pass%",        yLabel:"Duell%" },
-  BACK: { xKey:"passAcc",  yKey:"duelWin",       xLabel:"Pass%",        yLabel:"Duell%" },
+  ALL:  {xKey:"passAcc",  yKey:"duelWin",      xLabel:"Pass%",       yLabel:"Duell%"},
+  CF:   {xKey:"goals",    yKey:"xG",           xLabel:"Goals/90",    yLabel:"xG/90"},
+  WING: {xKey:"progRuns", yKey:"dribbleSucc",  xLabel:"ProgRuns/90", yLabel:"Dribble%"},
+  CM:   {xKey:"passAcc",  yKey:"interceptions",xLabel:"Pass%",       yLabel:"Int/90"},
+  CB:   {xKey:"passAcc",  yKey:"duelWin",      xLabel:"Pass%",       yLabel:"Duell%"},
+  BACK: {xKey:"progRuns", yKey:"duelWin",      xLabel:"ProgRuns/90", yLabel:"Duell%"},
 };
 
 function Dot({cx,cy,payload}){
@@ -39,38 +85,28 @@ function STip({active,payload,xKey,yKey,xLabel,yLabel}){
   );
 }
 
-// Position-specific table columns
-const tableCols = {
-  CF:   [{l:"G/90",k:"goals"},{l:"xG/90",k:"xG"},{l:"SoT/90",k:"shotsOT"},{l:"Touch felt",k:"touchesPenArea"},{l:"Duell%",k:"duelWin"},{l:"Luft%",k:"aerialWin"}],
-  WING: [{l:"G/90",k:"goals"},{l:"A/90",k:"assists"},{l:"Dribble%",k:"dribbleSucc"},{l:"ProgRuns",k:"progRuns"},{l:"ShotAss",k:"shotAssists"},{l:"Touch felt",k:"touchesPenArea"}],
-  CM:   [{l:"Pass%",k:"passAcc"},{l:"Int/90",k:"interceptions"},{l:"Duell%",k:"duelWin"},{l:"ProgRuns",k:"progRuns"},{l:"ShotAss",k:"shotAssists"},{l:"Rec.opp",k:"recoveriesOpp"}],
-  CB:   [{l:"Duell%",k:"duelWin"},{l:"Luft%",k:"aerialWin"},{l:"Int/90",k:"interceptions"},{l:"Pass%",k:"passAcc"},{l:"LongPass%",k:"longPassAcc"},{l:"ProgRuns",k:"progRuns"}],
-  BACK: [{l:"Duell%",k:"duelWin"},{l:"Pass%",k:"passAcc"},{l:"ProgRuns",k:"progRuns"},{l:"ShotAss",k:"shotAssists"},{l:"Int/90",k:"interceptions"},{l:"Luft%",k:"aerialWin"}],
-  ALL:  [{l:"G/90",k:"goals"},{l:"Pass%",k:"passAcc"},{l:"Duell%",k:"duelWin"},{l:"Luft%",k:"aerialWin"},{l:"Int/90",k:"interceptions"},{l:"ProgRuns",k:"progRuns"}],
-};
-
-// Which cols to colour (position-relevant only)
-const coloredCols = {
-  CF:   ["goals","xG","duelWin","touchesPenArea"],
-  WING: ["goals","assists","dribbleSucc","progRuns"],
-  CM:   ["passAcc","interceptions","duelWin","progRuns"],
-  CB:   ["duelWin","aerialWin","interceptions","passAcc"],
-  BACK: ["duelWin","passAcc","progRuns","interceptions"],
-  ALL:  [],
-};
+const groups = [
+  {id:"ALL",  label:"Alle"},
+  {id:"CF",   label:"CF / Spiss"},
+  {id:"WING", label:"Wing / Kant"},
+  {id:"CM",   label:"CM / AMF"},
+  {id:"CB",   label:"CB"},
+  {id:"BACK", label:"Back / WB"},
+];
 
 export default function App(){
-  const [sel,setSel]   = useState(null);
-  const [grp,setGrp]   = useState("ALL");
-  const [q,setQ]       = useState("");
-  const [sk,setSk]     = useState("name");
-  const [sd,setSd]     = useState(1);
-  const [bm,setBm]     = useState(null);
+  const [sel,  setSel]  = useState(null);
+  const [grp,  setGrp]  = useState("ALL");
+  const [q,    setQ]    = useState("");
+  const [sk,   setSk]   = useState("name");
+  const [sd,   setSd]   = useState(1);
+  const [bm,   setBm]   = useState(null);
 
-  const axes = scatterAxes[grp] ?? scatterAxes.ALL;
+  const axes        = scatterAxes[grp] ?? scatterAxes.ALL;
   const activeBench = grp !== "ALL" ? benchmarks[grp] : null;
-  const cols = tableCols[grp] ?? tableCols.ALL;
-  const colored = coloredCols[grp] ?? [];
+  const cols        = grp !== "ALL" ? (tableCols[grp] ?? []) : [];
+  // Which cols to colour — all posGroup-specific cols are coloured
+  const coloredKeys = cols.map(c => c.k);
 
   const filtered = useMemo(() =>
     players.filter(p => {
@@ -91,17 +127,17 @@ export default function App(){
 
   function ts(k){ if(sk===k) setSd(d=>-d); else { setSk(k); setSd(-1); } }
 
-  const groups = [
-    { id:"ALL",  label:"Alle" },
-    { id:"CF",   label:"CF / Spiss" },
-    { id:"WING", label:"Wing / Kant" },
-    { id:"CM",   label:"CM / AMF" },
-    { id:"CB",   label:"CB" },
-    { id:"BACK", label:"Back / WB" },
+  // Fixed header cols (always shown)
+  const fixedCols = [
+    {l:"Spiller", k:"name"},
+    {l:"Klubb",   k:null},
+    {l:"Pos",     k:null},
+    {l:"Min",     k:"minutes"},
   ];
 
   return (
     <div style={{minHeight:"100vh",background:"#0a0f1a",color:"#f9fafb",fontFamily:"system-ui,sans-serif"}}>
+
       {/* Header */}
       <div style={{borderBottom:"1px solid #1f2937",padding:"20px 32px",display:"flex",alignItems:"center",gap:16}}>
         <div>
@@ -118,14 +154,16 @@ export default function App(){
       </div>
 
       <div style={{padding:"24px 32px"}}>
+
         {/* Filters */}
         <div style={{display:"flex",gap:8,flexWrap:"wrap",marginBottom:20,alignItems:"center"}}>
           {groups.map(g=>(
-            <button key={g.id} onClick={()=>setGrp(g.id)} style={{
+            <button key={g.id} onClick={()=>{setGrp(g.id);setSk("name");}} style={{
               background:grp===g.id?"#1d4ed8":"#1f2937",
               color:grp===g.id?"#fff":"#9ca3af",
               border:"none",borderRadius:8,padding:"6px 16px",
-              fontSize:13,cursor:"pointer",fontWeight:grp===g.id?700:400
+              fontSize:13,cursor:"pointer",fontWeight:grp===g.id?700:400,
+              transition:"all .15s",
             }}>{g.label}</button>
           ))}
           <input placeholder="🔍 Søk spiller / klubb..." value={q}
@@ -134,11 +172,32 @@ export default function App(){
               borderRadius:8,padding:"6px 14px",color:"#f9fafb",fontSize:13,outline:"none",minWidth:200}}/>
         </div>
 
+        {/* Context bar — shown when a specific group is active */}
+        {grp !== "ALL" && (
+          <div style={{
+            background:"#111827",border:"1px solid #1f2937",borderRadius:10,
+            padding:"10px 16px",marginBottom:16,
+            display:"flex",alignItems:"center",gap:12,fontSize:13,
+          }}>
+            <span style={{color:"#6b7280"}}>Viser:</span>
+            <span style={{color:"#f9fafb",fontWeight:700}}>{groups.find(g=>g.id===grp)?.label}</span>
+            <span style={{color:"#374151"}}>·</span>
+            <span style={{color:"#6b7280"}}>Benchmark:</span>
+            <span style={{color:"#22c55e",fontWeight:700}}>{activeBench?.fullName}</span>
+            <span style={{color:"#374151"}}>·</span>
+            <span style={{color:"#6b7280"}}>{activeBench?.position} · {activeBench?.club}</span>
+            <span style={{marginLeft:"auto",color:"#4b5563",fontSize:12}}>
+              Metrics: {cols.map(c=>c.l).join(" · ")}
+            </span>
+          </div>
+        )}
+
         {/* Scatter */}
         <div style={{background:"#111827",borderRadius:14,padding:"20px 20px 10px",marginBottom:24,border:"1px solid #1f2937"}}>
           <div style={{fontSize:13,color:"#6b7280",marginBottom:12,fontWeight:600}}>
             {axes.xLabel} vs {axes.yLabel}
-            {activeBench && <span style={{color:"#4b5563",fontWeight:400}}> · Stiplede linjer = {activeBench.name}</span>}
+            {activeBench && <span style={{color:"#4b5563",fontWeight:400}}> · Stiplede linjer = {activeBench.name} (benchmark)</span>}
+            {grp === "ALL" && <span style={{color:"#4b5563",fontWeight:400}}> · Velg en posisjon for å se benchmark-linjer</span>}
           </div>
           <ResponsiveContainer width="100%" height={240}>
             <ScatterChart margin={{top:10,right:20,bottom:20,left:0}}>
@@ -161,36 +220,61 @@ export default function App(){
 
         {/* Table */}
         <div style={{background:"#111827",borderRadius:14,border:"1px solid #1f2937",overflow:"hidden"}}>
-          <div style={{padding:"12px 20px",borderBottom:"1px solid #1f2937",fontSize:13,color:"#6b7280"}}>
-            {sorted.length} spillere · {grp === "ALL" ? "Alle posisjoner" : posGroupLabels[grp]}
-            {activeBench && <span style={{color:"#4b5563"}}> · Benchmark: {activeBench.fullName}</span>}
+          <div style={{
+            padding:"12px 20px",borderBottom:"1px solid #1f2937",
+            display:"flex",alignItems:"center",justifyContent:"space-between",
+          }}>
+            <span style={{fontSize:13,color:"#6b7280"}}>
+              {sorted.length} spillere
+              {grp !== "ALL" && <span style={{color:"#4b5563"}}> · {groups.find(g=>g.id===grp)?.label} · Benchmark: {activeBench?.name}</span>}
+            </span>
+            {grp === "ALL" && (
+              <span style={{fontSize:12,color:"#4b5563",fontStyle:"italic"}}>
+                Velg en posisjon for posisjonsspesifikke kolonner og farger
+              </span>
+            )}
           </div>
           <div style={{overflowX:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:13}}>
               <thead>
                 <tr style={{borderBottom:"1px solid #1f2937"}}>
-                  {[{l:"Spiller",k:"name"},{l:"Klubb",k:null},{l:"Pos",k:null},{l:"Min",k:"minutes"},
-                    ...cols,
-                    {l:"Vs. Viking",k:null}
-                  ].map(({l,k})=>(
+                  {/* Fixed cols */}
+                  {fixedCols.map(({l,k})=>(
                     <th key={l} onClick={()=>k&&ts(k)} style={{
                       padding:"10px 14px",textAlign:"left",color:"#6b7280",fontWeight:600,
                       cursor:k?"pointer":"default",userSelect:"none",whiteSpace:"nowrap",
-                      background:sk===k?"#1a2332":"transparent"
+                      background:sk===k?"#1a2332":"transparent",
                     }}>{l}{sk===k?(sd===1?" ↑":" ↓"):""}</th>
                   ))}
+                  {/* Position-specific stat cols */}
+                  {cols.map(({l,k})=>(
+                    <th key={k} onClick={()=>ts(k)} style={{
+                      padding:"10px 14px",textAlign:"left",color:"#22c55e",fontWeight:700,
+                      cursor:"pointer",userSelect:"none",whiteSpace:"nowrap",
+                      background:sk===k?"#1a2332":"transparent",
+                      borderLeft: cols.indexOf({l,k})===0 ? "1px solid #1f2937" : "none",
+                    }}>{l}{sk===k?(sd===1?" ↑":" ↓"):""}</th>
+                  ))}
+                  {/* Vs Viking always last */}
+                  <th style={{padding:"10px 14px",textAlign:"left",color:"#6b7280",fontWeight:600,whiteSpace:"nowrap"}}>
+                    Vs. Viking
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {sorted.map(player=>{
-                  const bench = benchmarks[player.posGroup];
+                {sorted.map(player => {
+                  const bench  = benchmarks[player.posGroup];
                   const rating = getOverallRating(player);
-                  const rel = coloredCols[player.posGroup] ?? [];
+                  // Only colour stats if viewing that player's own position group
+                  const showColoured = grp === player.posGroup || grp === "ALL";
+
                   return (
                     <tr key={player.id} onClick={()=>setSel(player)}
                       style={{borderBottom:"1px solid #1a2332",cursor:"pointer"}}
                       onMouseEnter={e=>e.currentTarget.style.background="#1a2332"}
                       onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+
+                      {/* Name */}
                       <td style={{padding:"11px 14px",whiteSpace:"nowrap"}}>
                         <span style={{marginRight:6}}>{player.flag??""}</span>
                         <span style={{fontWeight:700,color:"#f9fafb"}}>{player.fullName}</span>
@@ -201,34 +285,59 @@ export default function App(){
                           <span style={{marginLeft:6,fontSize:10,background:"#7c3aed",color:"#ddd6fe",padding:"1px 6px",borderRadius:99}}>VFK</span>
                         )}
                       </td>
+                      {/* Club */}
                       <td style={{padding:"11px 14px",color:"#9ca3af"}}>{player.club}</td>
+                      {/* Pos badge */}
                       <td style={{padding:"11px 14px"}}>
-                        <span style={{background:"#1f2937",color:"#9ca3af",fontSize:11,padding:"2px 7px",borderRadius:4}}>
+                        <span style={{
+                          background: {
+                            CF:"#1a3a1a", WING:"#1a2a3a", CM:"#2a1a3a",
+                            CB:"#3a2a1a", BACK:"#3a1a2a"
+                          }[player.posGroup] ?? "#1f2937",
+                          color: {
+                            CF:"#4ade80", WING:"#60a5fa", CM:"#c084fc",
+                            CB:"#fbbf24", BACK:"#f87171"
+                          }[player.posGroup] ?? "#9ca3af",
+                          fontSize:11, fontWeight:700,
+                          padding:"2px 8px", borderRadius:4,
+                        }}>
                           {posGroupLabels[player.posGroup]}
                         </span>
                       </td>
-                      <td style={{padding:"11px 14px",color:"#6b7280"}}>{player.stats.minutes?.toLocaleString()??""}</td>
-                      {cols.map(({k})=>{
-                        const pv = player.stats[k]??0;
-                        const bv = bench?.stats[k]??null;
-                        const isPct = ["passAcc","duelWin","aerialWin","longPassAcc","dribbleSucc"].includes(k);
+                      {/* Minutes */}
+                      <td style={{padding:"11px 14px",color:"#6b7280"}}>
+                        {player.stats.minutes?.toLocaleString()??"—"}
+                      </td>
+
+                      {/* Position-specific stat cols */}
+                      {cols.map(({k,isPct}) => {
+                        const pv = player.stats[k] ?? 0;
+                        const bv = bench?.stats[k] ?? null;
+                        // Only colour if this player is in the filtered position group
                         let color = "#6b7280";
-                        if(bench && bv!==null && rel.includes(k)){
-                          color = RC[compareVsBenchmark(pv,bv)];
+                        if (bench && bv !== null && player.posGroup === grp) {
+                          color = RC[compareVsBenchmark(pv, bv)];
                         }
                         return (
-                          <td key={k} style={{padding:"11px 14px",color,fontWeight:rel.includes(k)?600:400}}>
+                          <td key={k} style={{
+                            padding:"11px 14px",
+                            color: player.posGroup === grp ? color : "#4b5563",
+                            fontWeight: player.posGroup === grp ? 600 : 400,
+                            borderLeft: cols.indexOf({k,isPct})===0?"1px solid #1a2332":"none",
+                          }}>
                             {isPct ? pv.toFixed(1)+"%" : pv.toFixed(2)}
                           </td>
                         );
                       })}
+
+                      {/* Vs Viking */}
                       <td style={{padding:"11px 14px"}}>
-                        {rating?(
+                        {rating ? (
                           <span style={{display:"inline-flex",alignItems:"center",gap:4,color:RC[rating],fontSize:12,fontWeight:700}}>
                             <span style={{width:7,height:7,borderRadius:"50%",background:RC[rating]}}/>
                             {RL[rating]}
                           </span>
-                        ):<span style={{color:"#374151"}}>—</span>}
+                        ) : <span style={{color:"#374151"}}>—</span>}
                       </td>
                     </tr>
                   );
@@ -246,74 +355,87 @@ export default function App(){
           <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
             {Object.entries(benchmarks).map(([key,b])=>(
               <div key={key} onClick={()=>setBm(key)}
-                style={{background:"#111827",border:"1px solid #1f2937",borderRadius:10,
-                  padding:"12px 16px",minWidth:160,cursor:"pointer"}}
-                onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"}
-                onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
-                <div style={{fontSize:10,color:"#6b7280",fontWeight:700,marginBottom:3,textTransform:"uppercase"}}>{posGroupLabels[key]??key}</div>
+                style={{
+                  background: grp===key?"#1a2d1a":"#111827",
+                  border:`1px solid ${grp===key?"#22c55e":"#1f2937"}`,
+                  borderRadius:10,padding:"12px 16px",minWidth:165,cursor:"pointer",
+                  transition:"all .15s",
+                }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor="#374151"}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor=grp===key?"#22c55e":"#1f2937"}}>
+                <div style={{fontSize:10,color:"#6b7280",fontWeight:700,marginBottom:3,textTransform:"uppercase"}}>
+                  {posGroupLabels[key]??key}
+                </div>
                 <div style={{fontWeight:800,color:"#f9fafb",marginBottom:1}}>{b.fullName}</div>
                 <div style={{fontSize:12,color:"#6b7280"}}>{b.position} · {b.club}</div>
               </div>
             ))}
           </div>
         </div>
+
       </div>
 
       {/* Player dashboard */}
-      {sel&&(
-        <div style={{position:"fixed",inset:0,background:"#f8f8f6",overflowY:"auto",zIndex:1000,padding:"48px 32px 48px"}}>
-          <button onClick={()=>setSel(null)} style={{position:"fixed",top:16,left:16,background:"#1f2937",border:"none",
-            color:"#f9fafb",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontSize:13,zIndex:1001}}>
-            ← Tilbake
-          </button>
+      {sel && (
+        <div style={{position:"fixed",inset:0,background:"#f8f8f6",overflowY:"auto",zIndex:1000,padding:"48px 32px"}}>
+          <button onClick={()=>setSel(null)} style={{
+            position:"fixed",top:16,left:16,background:"#1f2937",border:"none",
+            color:"#f9fafb",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontSize:13,zIndex:1001,
+          }}>← Tilbake</button>
           <div style={{maxWidth:900,margin:"0 auto"}}>
             {sel.id==="paananen" ? <PaananenDashboard/> :
              sel.id==="diarra"   ? <DiarraDashboard/>   :
              sel.id==="kilen"    ? <KilenDashboard/>    :
-             <PlayerDashboard player={sel} />}
+             <PlayerDashboard player={sel}/>}
           </div>
         </div>
       )}
 
       {/* Benchmark modal */}
-      {bm&&(()=>{
-        const b=benchmarks[bm];
-        const metrics=posMetrics[bm]?.table??[];
-        return(
-          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",
-            alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}
+      {bm && (()=>{
+        const b   = benchmarks[bm];
+        const mets = tableCols[bm] ?? [];
+        return (
+          <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",
+            display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}}
             onClick={()=>setBm(null)}>
             <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:16,
-              width:"100%",maxWidth:480,padding:28}} onClick={e=>e.stopPropagation()}>
+              width:"100%",maxWidth:500,padding:28}} onClick={e=>e.stopPropagation()}>
               <div style={{display:"flex",justifyContent:"space-between",marginBottom:16}}>
                 <div>
-                  <div style={{fontSize:11,color:"#6b7280",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>
-                    {posGroupLabels[bm]??bm} — Viking FK Benchmark
+                  <div style={{fontSize:11,color:"#6b7280",fontWeight:700,marginBottom:4,
+                    textTransform:"uppercase",letterSpacing:1}}>
+                    {posGroupLabels[bm]} — Viking FK Benchmark
                   </div>
                   <h2 style={{margin:0,fontSize:20,fontWeight:900,color:"#f9fafb"}}>{b.fullName}</h2>
                   <div style={{color:"#6b7280",fontSize:13,marginTop:3}}>{b.position} · {b.club}</div>
                 </div>
-                <button onClick={()=>setBm(null)} style={{background:"none",border:"none",color:"#6b7280",fontSize:22,cursor:"pointer"}}>✕</button>
+                <button onClick={()=>setBm(null)}
+                  style={{background:"none",border:"none",color:"#6b7280",fontSize:22,cursor:"pointer"}}>✕</button>
+              </div>
+              <div style={{
+                fontSize:12,color:"#4b5563",marginBottom:12,
+                padding:"8px 12px",background:"#1a2332",borderRadius:8,
+              }}>
+                Metrics for {posGroupLabels[bm]}: {mets.map(c=>c.l).join(" · ")}
               </div>
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-                {metrics.map(k=>{
-                  const isPct=["passAcc","duelWin","aerialWin","longPassAcc","dribbleSucc"].includes(k);
-                  const label=posMetrics[bm]?.labels?.[k]??k;
-                  const val=b.stats[k];
-                  return(
-                    <div key={k} style={{background:"#1f2937",borderRadius:8,padding:"10px 12px"}}>
-                      <div style={{fontSize:11,color:"#6b7280",marginBottom:2}}>{label}</div>
-                      <div style={{fontSize:17,fontWeight:700,color:"#f9fafb"}}>
-                        {val!=null?(isPct?val.toFixed(1)+"%":val.toFixed(2)):"—"}
-                      </div>
+                {mets.map(({l,k,isPct}) => (
+                  <div key={k} style={{background:"#1f2937",borderRadius:8,padding:"10px 12px"}}>
+                    <div style={{fontSize:11,color:"#6b7280",marginBottom:2}}>{l}</div>
+                    <div style={{fontSize:18,fontWeight:700,color:"#f9fafb"}}>
+                      {b.stats[k] != null
+                        ? isPct ? b.stats[k].toFixed(1)+"%" : b.stats[k].toFixed(2)
+                        : "—"}
                     </div>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         );
       })()}
+
     </div>
   );
 }
