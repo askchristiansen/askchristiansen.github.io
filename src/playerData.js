@@ -31,6 +31,16 @@ export const benchmarks = {
       touchesPenArea: 1.42, progRuns: 1.02, shotAssists: 0.66,
     },
   },
+  LB: {
+    name: "K. Haugen", fullName: "Kristoffer Haugen",
+    club: "Viking FK", position: "LB",
+    stats: {
+      goals: 0.03, assists: 0.16, xG: 0.08, shots: 0.45, shotsOT: 0.12,
+      passAcc: 78.0, longPassAcc: 49.0, dribbleSucc: 62.5, dribbles: 1.29,
+      duelWin: 54.0, aerialWin: 46.2, interceptions: 4.77, recoveriesOpp: 2.42,
+      touchesPenArea: 2.03, progRuns: 1.48, shotAssists: 1.06,
+    },
+  },
   CB: {
     name: "H. Falchener", fullName: "Henrik Falchener",
     club: "Viking FK", position: "CB",

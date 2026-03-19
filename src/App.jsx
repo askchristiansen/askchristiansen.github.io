@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 import { players, benchmarks, getBenchmarkKey, getOverallRating, compareVsBenchmark, coloredStats } from "./playerData";
-import PlayerCard from "./PlayerCard";
+import PlayerDashboard from "./PlayerDashboard";
 import PaananenDashboard from "./PaananenDashboard";
 import DiarraDashboard from "./DiarraDashboard";
 import KilenDashboard from "./KilenDashboard";
@@ -30,7 +30,7 @@ const benchGroupMap = {"CF / Spiss":"CF","Wing / AMF":"WING","CM / DMF":"CM","CB
 function matchesGroup(p,g){
   if(g==="Alle")return true;
   const kw=posGroups[g]; const pos=(p.position??"").toUpperCase();
-  return kw.some(k=>pos.includes(k));
+  return kw.some(k=>pos.split(/[\/\s,]+/).map(s=>s.trim()).includes(k));
 }
 
 function Dot({cx,cy,payload}){
@@ -59,10 +59,9 @@ export default function App(){
   const [q,setQ]=useState("");
   const [sk,setSk]=useState("name");
   const [sd,setSd]=useState(1);
-  const [dash,setDash]=useState(null);
   const [bm,setBm]=useState(null);
 
-  function open(p){if(p.hasDetailedDashboard)setDash(p.id);else setSel(p);}
+  function open(p){setSel(p);}
 
   const axes=scatterAxes[grp]??scatterAxes["Alle"];
   const activeBench=benchGroupMap[grp]?benchmarks[benchGroupMap[grp]]:null;
@@ -88,6 +87,18 @@ export default function App(){
     {l:"Int/90",k:"interceptions"},{l:"Prog/90",k:"progRuns"},
   ];
 
+  // Which stats to colour per bench key
+  const colored = {
+    CB:["passAcc","duelWin","aerialWin","interceptions"],
+    LB:["passAcc","duelWin","aerialWin","interceptions"],
+    CF:["goals","xG","duelWin","progRuns"],
+    WING:["goals","assists","dribbleSucc","progRuns"],
+    CM:["passAcc","interceptions","duelWin","progRuns"],
+  };
+
+  // If a player has a dedicated old dashboard, show that; otherwise show universal
+  const legacyDash = {paananen:"paananen",diarra:"diarra",kilen:"kilen"};
+
   return(
     <div style={{minHeight:"100vh",background:"#0a0f1a",color:"#f9fafb",fontFamily:"system-ui,sans-serif"}}>
       <div style={{borderBottom:"1px solid #1f2937",padding:"20px 32px",display:"flex",alignItems:"center",gap:16}}>
@@ -98,7 +109,7 @@ export default function App(){
         <div style={{marginLeft:"auto",display:"flex",gap:16}}>
           {Object.entries(RL).map(([r,l])=>(
             <span key={r} style={{display:"flex",alignItems:"center",gap:5,fontSize:12,color:RC[r]}}>
-              <span style={{width:8,height:8,borderRadius:"50%",background:RC[r]}}/>  {l}
+              <span style={{width:8,height:8,borderRadius:"50%",background:RC[r]}}/> {l}
             </span>
           ))}
         </div>
@@ -152,7 +163,7 @@ export default function App(){
                 {sorted.map(player=>{
                   const bk=getBenchmarkKey(player.position);
                   const bench=bk?benchmarks[bk]:null;
-                  const rel=bk?(coloredStats[bk]??[]):[];
+                  const rel=bk?(colored[bk]??[]):[];
                   const rating=getOverallRating(player);
                   return(
                     <tr key={player.id} onClick={()=>open(player)} style={{borderBottom:"1px solid #1a2332",cursor:"pointer"}}
@@ -173,9 +184,7 @@ export default function App(){
                         let color="#6b7280";
                         if(bench&&bv!==null&&rel.includes(k)){
                           color=RC[compareVsBenchmark(pv,bv)];
-                        } else if(rel.includes(k)){
-                          color="#e5e7eb";
-                        }
+                        } else if(rel.includes(k)){color="#e5e7eb";}
                         return(
                           <td key={k} style={{padding:"11px 14px",color,fontWeight:rel.includes(k)?600:400}}>
                             {pv.toFixed(isPct?1:2)}{isPct?"%":""}
@@ -205,7 +214,7 @@ export default function App(){
           <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
             {Object.entries(benchmarks).map(([key,b])=>(
               <div key={key} onClick={()=>setBm(key)}
-                style={{background:"#111827",border:"1px solid #1f2937",borderRadius:10,padding:"12px 16px",minWidth:180,cursor:"pointer"}}
+                style={{background:"#111827",border:"1px solid #1f2937",borderRadius:10,padding:"12px 16px",minWidth:160,cursor:"pointer"}}
                 onMouseEnter={e=>e.currentTarget.style.borderColor="#374151"}
                 onMouseLeave={e=>e.currentTarget.style.borderColor="#1f2937"}>
                 <div style={{fontSize:10,color:"#6b7280",fontWeight:700,marginBottom:4,textTransform:"uppercase"}}>{key}</div>
@@ -217,13 +226,25 @@ export default function App(){
         </div>
       </div>
 
-      {sel&&<PlayerCard player={sel} onClose={()=>setSel(null)}/>}
+      {/* Player dashboard modal */}
+      {sel&&(
+        <div style={{position:"fixed",inset:0,background:"#f8f8f6",overflowY:"auto",zIndex:1000,padding:"32px"}}>
+          <button onClick={()=>setSel(null)} style={{position:"fixed",top:16,left:16,background:"#1f2937",border:"none",color:"#f9fafb",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontSize:13,zIndex:1001}}>← Tilbake</button>
+          <div style={{maxWidth:900,margin:"0 auto",paddingTop:16}}>
+            {sel.id==="paananen" ? <PaananenDashboard/> :
+             sel.id==="diarra"   ? <DiarraDashboard/>   :
+             sel.id==="kilen"    ? <KilenDashboard/>    :
+             <PlayerDashboard player={sel} onClose={()=>setSel(null)}/>}
+          </div>
+        </div>
+      )}
 
+      {/* Benchmark modal */}
       {bm&&(()=>{
         const b=benchmarks[bm];
         return(
           <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,0.75)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:1000,padding:16}} onClick={()=>setBm(null)}>
-            <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:16,width:"100%",maxWidth:460,padding:28,boxShadow:"0 25px 50px rgba(0,0,0,0.6)"}} onClick={e=>e.stopPropagation()}>
+            <div style={{background:"#111827",border:"1px solid #1f2937",borderRadius:16,width:"100%",maxWidth:460,padding:28}} onClick={e=>e.stopPropagation()}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
                 <div>
                   <div style={{fontSize:11,color:"#6b7280",fontWeight:700,marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Viking FK — {bm} Benchmark</div>
@@ -244,15 +265,6 @@ export default function App(){
           </div>
         );
       })()}
-
-      {["paananen","diarra","kilen"].map(id=>dash===id&&(
-        <div key={id} style={{position:"fixed",inset:0,background:"#0a0f1a",overflowY:"auto",zIndex:1000}}>
-          <button onClick={()=>setDash(null)} style={{position:"fixed",top:16,left:16,background:"#1f2937",border:"none",color:"#f9fafb",borderRadius:8,padding:"8px 16px",cursor:"pointer",fontSize:13,zIndex:1001}}>← Tilbake</button>
-          {id==="paananen"&&<PaananenDashboard/>}
-          {id==="diarra"&&<DiarraDashboard/>}
-          {id==="kilen"&&<KilenDashboard/>}
-        </div>
-      ))}
     </div>
   );
 }
