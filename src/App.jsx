@@ -86,12 +86,18 @@ function computeVerdict(player) {
     'Croatia. SuperSport HNL':0.77,
   }[player.league] ?? 0.75;
 
-  // Age bonus: ≤21 → 15% threshold reduction, 22 → 8%, else 0%
+  // Age bonus: tekniske posisjoner får full bonus, fysiske (CB/BACK) får halv
+  // ≤21: CF/WING/CM → 15%, CB/BACK → 8% | 22: alle → 8% | eldre: ingen
   const age = player.age ?? 25;
-  const ageFactor = age <= 21 ? 0.85 : age <= 22 ? 0.92 : 1.0;
+  const isPhysical = posGrp === 'CB' || posGrp === 'BACK';
+  const ageFactor = age <= 21 ? (isPhysical ? 0.92 : 0.85) : age <= 22 ? 0.92 : 1.0;
 
-  // Scale player stats up by league coefficient before comparing thresholds
-  const scaled = k => (player.stats[k] ?? 0) / leagueScale;
+  // Raw stats — ingen ligaskalering på terskler
+  // Unntak: CF duelWin skaleres med ligakoeff (duell% er kulturavhengig)
+  const raw = k => player.stats[k] ?? 0;
+  const rawScaled = k => (k === 'duelWin' && posGrp === 'CF')
+    ? (player.stats[k] ?? 0) / leagueScale
+    : (player.stats[k] ?? 0);
 
   const thresholds = {
     CF:   { keys:['goals','xG','duelWin'],            mins:[0.40,0.30,48] },
@@ -101,26 +107,26 @@ function computeVerdict(player) {
     BACK: { keys:['duelWin','passAcc','progRuns'],     mins:[50,76,1.0] },
   }[posGrp] ?? { keys:[], mins:[] };
 
-  // Apply both league scaling (on stats) and age factor (on thresholds)
-  // WING: creative profile — goals OR shotAssists>=1.0 counts as attacking output
+  // Aldersbonus + CF duelWin-skalering
+  // WING: creative profile — goals OR shotAssists>=1.0 teller som angrepsoutput
   const meetsMin = thresholds.keys.filter((k,i) => {
     const thresh = thresholds.mins[i] * ageFactor;
     if (posGrp === 'WING' && k === 'goals') {
-      return scaled('goals') >= thresh || scaled('shotAssists') >= 1.0 * ageFactor;
+      return raw('goals') >= thresh || raw('shotAssists') >= 1.0 * ageFactor;
     }
-    return scaled(k) >= thresh;
+    return rawScaled(k) >= thresh;
   }).length;
   const total = thresholds.keys.length;
 
-  // Risk vs benchmark: use league-scaled stats
+  // Risikovurdering: sammenlign mot benchmark, juster for ligakvalitet
   const riskScores = metrics.risiko.map(k => {
-    const pv = scaled(k), bv = bench.stats[k] ?? 0;
+    const pv = raw(k) / leagueScale, bv = bench.stats[k] ?? 0;
     const diff = bv > 0 ? ((pv - bv) / bv) * 100 : 0;
     return Math.min(90, Math.round(Math.abs(diff)));
   });
   const avgRisk = riskScores.length ? riskScores.reduce((s,v)=>s+v,0)/riskScores.length : 50;
 
-  // Age softens risk ceiling slightly for young players
+  // Aldersbonus gir romsligere risikotak
   const riskCeiling = age <= 21 ? [38, 58, 72] : [30, 50, 65];
 
   if (meetsMin===total && avgRisk<riskCeiling[0] && leagueScale>=0.85) return "STRONG BUY";
