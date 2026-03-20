@@ -95,10 +95,11 @@ function computeVerdict(player) {
     'Denmark. Superliga':0.90,'Denmark. 1st Division':0.80,
     'England. League One':0.85,'Scotland. Premiership':0.88,
     'Finland. Veikkausliiga':0.78,'Netherlands. Eerste Divisie':0.82,
+    'Netherlands. Eredivisie':1.05,
     'Bulgaria. First League':0.72,'Hungary. NB I':0.70,
     'Lithuania. A Lyga':0.68,'Slovenia. Prva Liga':0.75,
     'Croatia. SuperSport HNL':0.77,
-    
+    'United States. MLS':0.65,'Australia. A-League':0.65,
   }[player.league] ?? 0.75;
   if (meetsMin===total && avgRisk<30 && leagueScale>=0.85) return "STRONG BUY";
   if (meetsMin>=Math.ceil(total*0.67) && avgRisk<50) return "BUY";
@@ -502,6 +503,30 @@ export default function App(){
           </div>
         );
       })()}
+
+      {/* ── FOOTER ── */}
+      <div style={{
+        borderTop:"1px solid #1f2937",
+        padding:"16px 20px",
+        marginTop:8,
+      }}>
+        <div style={{maxWidth:1100,margin:"0 auto",display:"flex",flexWrap:"wrap",gap:12,alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{fontSize:11,color:"#4b5563"}}>
+            <span style={{color:"#6b7280"}}>Datakilde:</span>{" "}
+            <span style={{color:"#9ca3af"}}>Wyscout · Transfermarkt</span>
+            <span style={{color:"#374151",margin:"0 8px"}}>·</span>
+            <span style={{color:"#6b7280"}}>Periode:</span>{" "}
+            <span style={{color:"#9ca3af"}}>Sesong 2025 (Skandinavia/Finland) · Sesong 2025/26 (øvrige ligaer)</span>
+            <span style={{color:"#374151",margin:"0 8px"}}>·</span>
+            <span style={{color:"#6b7280"}}>Sist oppdatert:</span>{" "}
+            <span style={{color:"#9ca3af"}}>Mars 2026</span>
+          </div>
+          <div style={{fontSize:11,color:"#374151"}}>
+            Alle stats per 90 min · Spillere sammenlignes mot utvalgte Viking FK-spillere i tilsvarende posisjon · Projeksjoner er estimater basert på ligakontekst og systemanalyse
+          </div>
+        </div>
+      </div>
+
     </div>
   );
 }
