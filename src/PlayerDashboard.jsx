@@ -84,6 +84,20 @@ function Oversikt({ player, bench, metrics }) {
 
   return (
     <div>
+      {/* Scout bio */}
+      {player.bio && (
+        <div style={{
+          background:'#f5f5f3', borderLeft:'3px solid #185FA5',
+          borderRadius:'0 8px 8px 0', padding:'12px 16px', marginBottom:20,
+          fontSize:13, color:'#1a1a1a', lineHeight:1.65,
+        }}>
+          <div style={{ fontSize:11, fontWeight:700, color:'#185FA5', marginBottom:4, textTransform:'uppercase', letterSpacing:1 }}>
+            Scout-analyse
+          </div>
+          {player.bio}
+        </div>
+      )}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 24 }}>
         <KPI label="Minutter" value={s.minutes?.toLocaleString() ?? '—'} sub={`${s.matches ?? '—'} kamper`} />
         {keys.slice(0,3).map(k => {
